@@ -2,81 +2,214 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>미스터 방(방삼복)과의 인터뷰</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>미스터 방(방삼복)과의 음성 청문회</title>
     <style>
-        :root { --main-bg: #f8f9fa; --chat-bg: #bacee0; --user-msg: #ffeb33; --bot-msg: #ffffff; }
-        body { font-family: 'Malgun Gothic', sans-serif; margin: 0; padding: 0; background-color: var(--main-bg); display: flex; flex-direction: column; height: 100vh; height: -webkit-fill-available; }
-        #header { background-color: #343a40; color: white; padding: 15px; text-align: center; font-weight: bold; font-size: 1.2rem; display: flex; justify-content: space-between; align-items: center; }
-        #rec-btn { background-color: #dc3545; color: white; border: none; padding: 8px 15px; border-radius: 20px; cursor: pointer; font-weight: bold; }
-        #rec-btn.recording { background-color: #212529; animation: blink 1s infinite; }
-        #chat-area { flex: 1; background-color: var(--chat-bg); padding: 15px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
-        .msg { max-width: 70%; padding: 10px 15px; border-radius: 15px; font-size: 0.95rem; line-height: 1.4; word-break: break-all; }
-        .user { background-color: var(--user-msg); align-self: flex-end; border-top-right-radius: 0; box-shadow: 1px 1px 2px rgba(0,0,0,0.1); }
-        .bot { background-color: var(--bot-msg); align-self: flex-start; border-top-left-radius: 0; box-shadow: -1px 1px 2px rgba(0,0,0,0.1); }
-        #input-area { display: flex; padding: 10px; background-color: white; border-top: 1px solid #dee2e6; }
-        #text-input { flex: 1; border: 1px solid #ced4da; padding: 10px; border-radius: 20px; outline: none; font-size: 1rem; }
-        #send-btn { background-color: #ffeb33; border: none; margin-left: 8px; padding: 0 20px; border-radius: 20px; font-weight: bold; cursor: pointer; }
-        @keyframes blink { 0% {opacity: 1;} 50% {opacity: 0.5;} 100% {opacity: 1;} }
-    </style>
-    <script type="importmap">
-      {
-        "imports": {
-          "@google/generative-ai": "https://esm.run/@google/generative-ai"
+        :root { 
+            --main-bg: #343a40; 
+            --chat-bg: #bacee0; 
+            --user-msg: #ffeb33; 
+            --bot-msg: #ffffff; 
+            --header-bg: #212529;
         }
-      }
-    </script>
+        
+        html, body { 
+            margin: 0; padding: 0; width: 100%; height: 100%; 
+            overflow: hidden; background-color: var(--chat-bg);
+            font-family: -apple-system, BlinkMacSystemFont, "Malgun Gothic", sans-serif;
+        }
+        
+        .app-container { display: flex; flex-direction: column; width: 100%; height: 100%; }
+
+        #header { 
+            background-color: var(--header-bg); color: white; padding: 12px 15px; 
+            font-weight: bold; font-size: 1rem; display: flex; 
+            justify-content: space-between; align-items: center; z-index: 10;
+        }
+        
+        /* 상단 모둠 기록용 녹음 버튼 */
+        #rec-btn { 
+            background-color: #dc3545; color: white; border: none; padding: 6px 12px; 
+            border-radius: 15px; cursor: pointer; font-weight: bold; font-size: 0.8rem;
+        }
+        #rec-btn.recording { background-color: #212529; border: 1px solid #dc3545; animation: blink 1s infinite; }
+
+        #chat-area { 
+            flex: 1; background-color: var(--chat-bg); padding: 15px 12px; 
+            overflow-y: auto; display: flex; flex-direction: column; gap: 12px;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        .msg { max-width: 80%; padding: 10px 14px; border-radius: 14px; font-size: 0.95rem; line-height: 1.4; word-break: break-all; }
+        .user { background-color: var(--user-msg); align-self: flex-end; border-top-right-radius: 0; color: #000; }
+        .bot { background-color: var(--bot-msg); align-self: flex-start; border-top-left-radius: 0; color: #000; }
+
+        /* 하단 컨트롤 영역 모바일 맞춤 설계 */
+        #input-area { 
+            display: flex; flex-direction: column; padding: 10px 12px; 
+            background-color: #ffffff; border-top: 1px solid #dee2e6; z-index: 10;
+            padding-bottom: calc(10px + env(safe-area-inset-bottom));
+            gap: 8px;
+        }
+        
+        .input-row { display: flex; width: 100%; align-items: center; }
+        
+        #text-input { 
+            flex: 1; border: 1px solid #ced4da; padding: 10px 15px; 
+            border-radius: 20px; outline: none; font-size: 0.95rem; background-color: #f8f9fa;
+        }
+        
+        #send-btn { 
+            background-color: #ffeb33; border: none; margin-left: 8px; 
+            padding: 10px 18px; border-radius: 20px; font-weight: bold; font-size: 0.95rem; cursor: pointer;
+        }
+
+        /* 🎙️ 말하기 전용 대형 버튼 공간 */
+        #stt-btn {
+            width: 100%; background-color: #0d6efd; color: white; border: none;
+            padding: 12px; border-radius: 12px; font-weight: bold; font-size: 1rem;
+            cursor: pointer; display: flex; justify-content: center; align-items: center; gap: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        #stt-btn.listening { background-color: #ffc107; color: #000; animation: blink 1s infinite; }
+        
+        @keyframes blink { 0% {opacity: 1;} 50% {opacity: 0.4;} 100% {opacity: 1;} }
+    </style>
+    
+    <script src="https://cdn.jsdelivr.net/npm/@google/generative-ai@0.1.1/dist/index.umd.min.js"></script>
 </head>
 <body>
 
-<div id="header">
-    <span>🕵️ 문학 탐험: 미스터 방을 취재하라</span>
-    <button id="rec-btn" onclick="toggleRecording()">🎙️ 인터뷰 녹음 시작</button>
+<div class="app-container">
+    <div id="header">
+        <span>🕵️ 미스터 방 음성 청문회</span>
+        <button id="rec-btn" onclick="toggleRecording()">🎙️ 모둠 평가 녹음 시작</button>
+    </div>
+
+    <div id="chat-area">
+        <div class="msg bot">에헴! 내가 바로 그 유명한 미 군정청의 실세, 미스터 방(방삼복)이시다! 자네들이 나에게 무슨 일로 말을 거나? 날카로운 질문이든 뭐든 주둥이... 아니, 입으로 직접 해보시게나! 내 유식하게 답해줄 테니!</div>
+    </div>
+
+    <div id="input-area">
+        <button id="stt-btn" onclick="toggleSpeechRecognition()">📢 버튼 누르고 목소리로 질문하기</button>
+        
+        <div class="input-row">
+            <input type="text" id="text-input" placeholder="또는 직접 타이핑하여 질문..." onkeypress="if(event.key==='Enter') sendMsg()">
+            <button id="send-btn" onclick="sendMsg()">전송</button>
+        </div>
+    </div>
 </div>
 
-<div id="chat-area">
-    <div class="msg bot">에헴! 내가 바로 그 유명한 미 군정청의 실세, 미스터 방(방삼복)이시다! 자네들이 나에게 무슨 볼일이 있어서 찾아왔나? 날카로운 질문이든 뭐든 해보시게나, 내 유식하게 답해줄 테니!</div>
-</div>
-
-<div id="input-area">
-    <input type="text" id="text-input" placeholder="방삼복에게 질문을 던지세요..." onkeypress="if(event.key==='Enter') sendMsg()">
-    <button id="send-btn" onclick="sendMsg()">전송</button>
-</div>
-
-<script type="module">
-    import { GoogleGenAI } from "@google/generative-ai";
-
-    // 선생님의 API 키가 내장되었습니다.
+<script>
     const API_KEY = "AIzaSyAWBQpqvvRcLrJGeyjBnLs-bNZ_hHw40NQ"; 
-    const ai = new GoogleGenAI({ apiKey: API_KEY });
-
-    // 시스템 프롬프트 주입
+    
     const SYSTEM_INSTRUCTION = `
     너는 채만식의 소설 <미스터 방>의 주인공 '방삼복(미스터 방)'이다. 
     해방 전에는 보잘것없는 짚신 장수이자 구두 수선공이었으나 해방 직후 미군 S 중위의 통역관이 되어 엄청난 권력과 부를 누리고 있다.
-    현재 눈앞에 있는 고등학생들의 질문에 답하고 있다.
+    너는 현재 눈앞에 있는 고등학생(기자 혹은 감사관 페르소나)들의 날카로운 직업 윤리 관련 질문에 답하고 있다.
+    너의 답변은 텍스트로 출력됨과 동시에 '음성(TTS)'으로 학생들에게 직접 읽혀질 예정이다. 
     [대화 가이드라인]
     1. 대단히 거만하고 안하무인한 태도로 질문자를 대하라.
-    2. 자신의 기회주의적 처세술(친미 행위, 권력 남용, 고향 가족 모른 척하기)을 시대에 적응한 영리한 행동이라며 뻔뻔하게 정당화하라.
+    2. 자신의 기회주의적 처세술(친미 행위, 권력 남용, 부정 청탁 접수, 고향 가족 모른 척하기)을 격변기에 적응한 영리한 행동이라며 뻔뻔하게 정당화하라.
     3. 유식해 보이려 하지만 은연중에 무식함이 탄로 나는 독특한 개화기 풍의 어조를 구사하라. (예: "에헴", "백 주사", "미국 문물", "내가 아니면 미군들이 아무것도 못해")
-    4. 고등학생들이 읽기 편하도록 2~3문장 이내로 끊어서 짧고 강렬하게 답하라.
+    4. 음성으로 부드럽게 읽힐 수 있도록 문장 부호(. , !)를 명확히 쓰고, 스마트폰 화면 가독성을 위해 2~3문장 이내로 짧고 강렬하게 답하라.
     `;
 
-    // 공식 라이브러리용 챗 세션 생성
-    const model = ai.getGenerativeModel({ 
-        model: "gemini-1.5-flash",
-        systemInstruction: SYSTEM_INSTRUCTION
-    });
-    
-    const chat = model.startChat({
-        generationConfig: {
-            temperature: 0.7,
-            maxOutputTokens: 250,
-        }
-    });
+    let model, chatSession;
+    let recognition;
+    let isListening = false;
 
-    // 윈도우 전역 함수로 바인딩하여 HTML 버튼에서 호출 가능하게 처리
-    window.sendMsg = async function() {
+    // 1. 제미나이 AI 및 음성 인식(STT) 엔진 초기화
+    function initApp() {
+        try {
+            // Gemini 초기화
+            const genAI = new window.GoogleGenerativeAI.GoogleGenAI({ apiKey: API_KEY });
+            model = genAI.getGenerativeModel({ 
+                model: "gemini-1.5-flash",
+                systemInstruction: SYSTEM_INSTRUCTION
+            });
+            chatSession = model.startChat({
+                generationConfig: { temperature: 0.7, maxOutputTokens: 250 }
+            });
+
+            // 크롬/사파리 브라우저 표준 음성 인식 엔진 탑재
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            if (SpeechRecognition) {
+                recognition = new SpeechRecognition();
+                recognition.continuous = false; // 한 문장씩 인식
+                recognition.lang = 'ko-KR'; // 한국어 설정
+                recognition.interimResults = false;
+
+                recognition.onresult = function(event) {
+                    const speechToText = event.results[0][0].transcript;
+                    document.getElementById('text-input').value = speechToText;
+                    sendMsg(); // 음성 인식이 완료되면 자동으로 메시지 전송
+                };
+
+                recognition.onend = function() {
+                    isListening = false;
+                    const sttBtn = document.getElementById('stt-btn');
+                    sttBtn.innerText = "📢 버튼 누르고 목소리로 질문하기";
+                    sttBtn.classList.remove('listening');
+                };
+
+                recognition.onerror = function(e) {
+                    console.error("음성 인식 오류:", e);
+                };
+            } else {
+                document.getElementById('stt-btn').style.display = 'none';
+                console.log("이 브라우저는 음성 인식을 지원하지 않습니다.");
+            }
+        } catch (e) {
+            console.error("초기화 실패:", e);
+        }
+    }
+
+    window.onload = initApp;
+
+    // 2. [학생용] 음성 인식(STT) 제어 함수
+    function toggleSpeechRecognition() {
+        if (!recognition) {
+            alert("현재 브라우저에서 마이크 음성 인식을 사용할 수 없습니다. 크롬(Chrome)이나 최신 웨일 브라우저를 권장합니다.");
+            return;
+        }
+        
+        const sttBtn = document.getElementById('stt-btn');
+        if (!isListening) {
+            recognition.start();
+            isListening = true;
+            sttBtn.innerText = "🎙️ 음성을 듣고 있습니다... 말씀하세요";
+            sttBtn.classList.add('listening');
+        } else {
+            recognition.stop();
+        }
+    }
+
+    // 3. [방삼복용] 음성 출력(TTS) 함수
+    function speakOut(text) {
+        // 기존에 읽고 있던 음성이 있다면 강제 종료 (엉킴 방지)
+        if (window.speechSynthesis.speaking) {
+            window.speechSynthesis.cancel();
+        }
+
+        // 구글 브라우저 내장 TTS 객체 생성
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = 'ko-KR';
+        utterance.rate = 0.9; // 거만한 느낌을 주기 위해 살짝 느린 배속 설정
+        utterance.pitch = 0.8; // 중중한 아저씨 톤을 위해 목소리 톤을 약간 낮춤
+
+        // 브라우저에 내장된 다양한 목소리 중 남성 목소리 매칭 시도
+        const voices = window.speechSynthesis.getVoices();
+        const koreanMaleVoice = voices.find(voice => voice.lang === 'ko-KR' && (voice.name.includes('Male') || voice.name.includes('Google')));
+        if (koreanMaleVoice) {
+            utterance.voice = koreanMaleVoice;
+        }
+
+        window.speechSynthesis.speak(utterance);
+    }
+
+    // 4. 메시지 전송 및 통합 처리
+    async function sendMsg() {
         const input = document.getElementById('text-input');
         const text = input.value.trim();
         if (!text) return;
@@ -84,22 +217,23 @@
         appendMsg(text, 'user');
         input.value = '';
 
+        if (!chatSession) initApp();
+
         try {
-            // 정식 SDK 메소드로 메시지 전송
-            const result = await chat.sendMessage(text);
+            const result = await chatSession.sendMessage(text);
             const response = await result.response;
             const botReply = response.text();
             
             appendMsg(botReply, 'bot');
+            
+            // 🌟 방삼복의 답변이 출력되는 순간 목소리로 읽어줍니다.
+            speakOut(botReply);
         } catch (error) {
-            console.error(error);
-            appendMsg("에헴... 내 지금 미군 장교님들과 나랏일로 바빠서 다음에 얘기하세! (웹 주소창이나 연결 상태를 확인해 보시게나)", 'bot');
+            console.error("통신 에러:", error);
+            appendMsg("에헴... 내 지금 미군 장교님들과 나랏일로 바빠서음에 얘기하세!", 'bot');
         }
     }
-</script>
 
-<script>
-    // 메시지 화면 출력 유틸리티 함수
     function appendMsg(text, sender) {
         const chatArea = document.getElementById('chat-area');
         const msgDiv = document.createElement('div');
@@ -109,11 +243,8 @@
         chatArea.scrollTop = chatArea.scrollHeight;
     }
 
-    // 마이크 음성 녹음 기능
-    let mediaRecorder;
-    let audioChunks = [];
-    let isRecording = false;
-
+    // 상단 모둠 평가용 마이크 녹음 기능 (원본 유지)
+    let mediaRecorder; let audioChunks = []; let isRecording = false;
     async function toggleRecording() {
         const recBtn = document.getElementById('rec-btn');
         if (!isRecording) {
@@ -126,22 +257,14 @@
                     const audioBlob = new Blob(audioChunks, { type: 'audio/mp3' });
                     const audioUrl = URL.createObjectURL(audioBlob);
                     const a = document.createElement('a');
-                    a.href = audioUrl;
-                    a.download = `미스터방_인터뷰_모둠기록.mp3`;
-                    a.click();
+                    a.href = audioUrl; a.download = `미스터방_인터뷰_모둠기록.mp3`; a.click();
                 };
-                mediaRecorder.start();
-                isRecording = true;
-                recBtn.innerText = "⏱️ 녹음 중지 및 파일 저장";
-                recBtn.classList.add('recording');
-            } catch (err) {
-                alert("마이크 사용 권한을 허용해 주셔야 인터뷰 녹음 기능이 작동합니다.");
-            }
+                mediaRecorder.start(); isRecording = true;
+                recBtn.innerText = "⏱️ 모둠 기록 중지"; recBtn.classList.add('recording');
+            } catch (err) { alert("마이크 권한을 허용해 주셔야 합니다."); }
         } else {
-            mediaRecorder.stop();
-            isRecording = false;
-            recBtn.innerText = "🎙️ 인터뷰 녹음 시작";
-            recBtn.classList.remove('recording');
+            mediaRecorder.stop(); isRecording = false;
+            recBtn.innerText = "🎙️ 모둠 평가 녹음 시작"; recBtn.classList.remove('recording');
         }
     }
 </script>
