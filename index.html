@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>미스터 방(방삼복)과의 인터뷰</title>
+    <style>
+        :root { --main-bg: #f8f9fa; --chat-bg: #bacee0; --user-msg: #ffeb33; --bot-msg: #ffffff; }
+        body { font-family: 'Malgun Gothic', sans-serif; margin: 0; padding: 0; background-color: var(--main-bg); display: flex; flex-direction: column; height: 100vh; height: -webkit-fill-available; }
+        #header { background-color: #343a40; color: white; padding: 15px; text-align: center; font-weight: bold; font-size: 1.2rem; display: flex; justify-content: space-between; align-items: center; }
+        #rec-btn { background-color: #dc3545; color: white; border: none; padding: 8px 15px; border-radius: 20px; cursor: pointer; font-weight: bold; }
+        #rec-btn.recording { background-color: #212529; animation: blink 1s infinite; }
+        #chat-area { flex: 1; background-color: var(--chat-bg); padding: 15px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
+        .msg { max-width: 70%; padding: 10px 15px; border-radius: 15px; font-size: 0.95rem; line-height: 1.4; word-break: break-all; }
+        .user { background-color: var(--user-msg); align-self: flex-end; border-top-right-radius: 0; box-shadow: 1px 1px 2px rgba(0,0,0,0.1); }
+        .bot { background-color: var(--bot-msg); align-self: flex-start; border-top-left-radius: 0; box-shadow: -1px 1px 2px rgba(0,0,0,0.1); }
+        #input-area { display: flex; padding: 10px; background-color: white; border-top: 1px solid #dee2e6; }
+        #text-input { flex: 1; border: 1px solid #ced4da; padding: 10px; border-radius: 20px; outline: none; font-size: 1rem; }
+        #send-btn { background-color: #ffeb33; border: none; margin-left: 8px; padding: 0 20px; border-radius: 20px; font-weight: bold; cursor: pointer; }
+        @keyframes blink { 0% {opacity: 1;} 50% {opacity: 0.5;} 100% {opacity: 1;} }
+    </style>
+    <script type="importmap">
+      {
+        "imports": {
+          "@google/generative-ai": "https://esm.run/@google/generative-ai"
+        }
+      }
+    </script>
+</head>
+<body>
+
+<div id="header">
+    <span>🕵️ 문학 탐험: 미스터 방을 취재하라</span>
+    <button id="rec-btn" onclick="toggleRecording()">🎙️ 인터뷰 녹음 시작</button>
+</div>
+
+<div id="chat-area">
+    <div class="msg bot">에헴! 내가 바로 그 유명한 미 군정청의 실세, 미스터 방(방삼복)이시다! 자네들이 나에게 무슨 볼일이 있어서 찾아왔나? 날카로운 질문이든 뭐든 해보시게나, 내 유식하게 답해줄 테니!</div>
+</div>
+
+<div id="input-area">
+    <input type="text" id="text-input" placeholder="방삼복에게 질문을 던지세요..." onkeypress="if(event.key==='Enter') sendMsg()">
+    <button id="send-btn" onclick="sendMsg()">전송</button>
+</div>
+
+<script type="module">
+    import { GoogleGenAI } from "@google/generative-ai";
+
+    // 선생님의 API 키가 내장되었습니다.
+    const API_KEY = "AIzaSyAWBQpqvvRcLrJGeyjBnLs-bNZ_hHw40NQ"; 
+    const ai = new GoogleGenAI({ apiKey: API_KEY });
+
+    // 시스템 프롬프트 주입
+    const SYSTEM_INSTRUCTION = `
+    너는 채만식의 소설 <미스터 방>의 주인공 '방삼복(미스터 방)'이다. 
+    해방 전에는 보잘것없는 짚신 장수이자 구두 수선공이었으나 해방 직후 미군 S 중위의 통역관이 되어 엄청난 권력과 부를 누리고 있다.
+    현재 눈앞에 있는 고등학생들의 질문에 답하고 있다.
+    [대화 가이드라인]
+    1. 대단히 거만하고 안하무인한 태도로 질문자를 대하라.
+    2. 자신의 기회주의적 처세술(친미 행위, 권력 남용, 고향 가족 모른 척하기)을 시대에 적응한 영리한 행동이라며 뻔뻔하게 정당화하라.
+    3. 유식해 보이려 하지만 은연중에 무식함이 탄로 나는 독특한 개화기 풍의 어조를 구사하라. (예: "에헴", "백 주사", "미국 문물", "내가 아니면 미군들이 아무것도 못해")
+    4. 고등학생들이 읽기 편하도록 2~3문장 이내로 끊어서 짧고 강렬하게 답하라.
+    `;
+
+    // 공식 라이브러리용 챗 세션 생성
+    const model = ai.getGenerativeModel({ 
+        model: "gemini-1.5-flash",
+        systemInstruction: SYSTEM_INSTRUCTION
+    });
+    
+    const chat = model.startChat({
+        generationConfig: {
+            temperature: 0.7,
+            maxOutputTokens: 250,
+        }
+    });
+
+    // 윈도우 전역 함수로 바인딩하여 HTML 버튼에서 호출 가능하게 처리
+    window.sendMsg = async function() {
+        const input = document.getElementById('text-input');
+        const text = input.value.trim();
+        if (!text) return;
+
+        appendMsg(text, 'user');
+        input.value = '';
+
+        try {
+            // 정식 SDK 메소드로 메시지 전송
+            const result = await chat.sendMessage(text);
+            const response = await result.response;
+            const botReply = response.text();
+            
+            appendMsg(botReply, 'bot');
+        } catch (error) {
+            console.error(error);
+            appendMsg("에헴... 내 지금 미군 장교님들과 나랏일로 바빠서 다음에 얘기하세! (웹 주소창이나 연결 상태를 확인해 보시게나)", 'bot');
+        }
+    }
+</script>
+
+<script>
+    // 메시지 화면 출력 유틸리티 함수
+    function appendMsg(text, sender) {
+        const chatArea = document.getElementById('chat-area');
+        const msgDiv = document.createElement('div');
+        msgDiv.className = `msg ${sender}`;
+        msgDiv.innerText = text;
+        chatArea.appendChild(msgDiv);
+        chatArea.scrollTop = chatArea.scrollHeight;
+    }
+
+    // 마이크 음성 녹음 기능
+    let mediaRecorder;
+    let audioChunks = [];
+    let isRecording = false;
+
+    async function toggleRecording() {
+        const recBtn = document.getElementById('rec-btn');
+        if (!isRecording) {
+            audioChunks = [];
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                mediaRecorder = new MediaRecorder(stream);
+                mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
+                mediaRecorder.onstop = () => {
+                    const audioBlob = new Blob(audioChunks, { type: 'audio/mp3' });
+                    const audioUrl = URL.createObjectURL(audioBlob);
+                    const a = document.createElement('a');
+                    a.href = audioUrl;
+                    a.download = `미스터방_인터뷰_모둠기록.mp3`;
+                    a.click();
+                };
+                mediaRecorder.start();
+                isRecording = true;
+                recBtn.innerText = "⏱️ 녹음 중지 및 파일 저장";
+                recBtn.classList.add('recording');
+            } catch (err) {
+                alert("마이크 사용 권한을 허용해 주셔야 인터뷰 녹음 기능이 작동합니다.");
+            }
+        } else {
+            mediaRecorder.stop();
+            isRecording = false;
+            recBtn.innerText = "🎙️ 인터뷰 녹음 시작";
+            recBtn.classList.remove('recording');
+        }
+    }
+</script>
+</body>
+</html>
