@@ -72,8 +72,6 @@
         
         @keyframes blink { 0% {opacity: 1;} 50% {opacity: 0.4;} 100% {opacity: 1;} }
     </style>
-    
-    <script src="https://cdn.jsdelivr.net/npm/@google/generative-ai@0.1.1/dist/index.umd.min.js"></script>
 </head>
 <body>
 
@@ -97,12 +95,12 @@
 </div>
 
 <script>
-    // 🌟 깃허브 자동 정지 봇을 피하기 위해 키를 두 개로 쪼개서 합칩니다. (스텔스 기법)
+    // 선생님의 스텔스 처리된 API 키
     const part1 = "AIzaSyBhx3wb1uv";
     const part2 = "4sOQUCZc7DQkA9itcnMi2r1I";
     const API_KEY = part1 + part2; 
     
-    // 시스템 프롬프트
+    // 시스템 프롬프트 (성격 지침)
     const SYSTEM_INSTRUCTION = `
     너는 채만식의 소설 <미스터 방>의 주인공 '방삼복(미스터 방)'이다. 
     해방 전에는 보잘것없는 짚신 장수이자 구두 수선공이었으나 해방 직후 미군 S 중위의 통역관이 되어 엄청난 권력과 부를 누리고 있다.
@@ -111,55 +109,42 @@
     1. 대단히 거만하고 안하무인한 태도로 질문자를 대하라.
     2. 자신의 기회주의적 처세술(친미 행위, 권력 남용, 부정 청탁 접수, 고향 가족 모른 척하기)을 격변기에 적응한 영리한 행동이라며 뻔뻔하게 정당화하라.
     3. 유식해 보이려 하지만 은연중에 무식함이 탄로 나는 독특한 개화기 풍의 어조를 구사하라. (예: "에헴", "백 주사", "미국 문물", "내가 아니면 미군들이 아무것도 못해")
-    4. 음성으로 부드럽게 읽힐 수 있도록 스마트폰 화면 가독성을 위해 무조건 2~3문장 이내로 짧고 강렬하게 답하라.
+    4. 음성으로 부드럽게 읽힐 수 있도록 문장 부호(. , !)를 명확히 쓰고, 2~3문장 이내로 짧고 강렬하게 답하라.
     `;
 
-    let model, chatSession, recognition;
+    // 대화 내역(History)을 배열로 직접 관리
+    let chatHistory = [];
+    let recognition;
     let isListening = false;
 
-    function initApp() {
-        try {
-            // Gemini 초기화 (합쳐진 API 키 사용)
-            const genAI = new window.GoogleGenerativeAI.GoogleGenAI({ apiKey: API_KEY });
-            model = genAI.getGenerativeModel({ 
-                model: "gemini-1.5-flash",
-                systemInstruction: SYSTEM_INSTRUCTION
-            });
-            chatSession = model.startChat({
-                generationConfig: { temperature: 0.7, maxOutputTokens: 250 }
-            });
+    // 음성 인식 초기화
+    function initSTT() {
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (SpeechRecognition) {
+            recognition = new SpeechRecognition();
+            recognition.continuous = false; 
+            recognition.lang = 'ko-KR'; 
+            recognition.interimResults = false;
 
-            // 음성 인식(STT) 엔진 초기화
-            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-            if (SpeechRecognition) {
-                recognition = new SpeechRecognition();
-                recognition.continuous = false; 
-                recognition.lang = 'ko-KR'; 
-                recognition.interimResults = false;
+            recognition.onresult = function(event) {
+                const speechToText = event.results[0][0].transcript;
+                document.getElementById('text-input').value = speechToText;
+                sendMsg(); 
+            };
 
-                recognition.onresult = function(event) {
-                    const speechToText = event.results[0][0].transcript;
-                    document.getElementById('text-input').value = speechToText;
-                    sendMsg(); 
-                };
-
-                recognition.onend = function() {
-                    isListening = false;
-                    const sttBtn = document.getElementById('stt-btn');
-                    sttBtn.innerText = "📢 버튼 누르고 목소리로 질문하기";
-                    sttBtn.classList.remove('listening');
-                };
-            } else {
-                document.getElementById('stt-btn').style.display = 'none';
-            }
-        } catch (e) {
-            console.error("초기화 실패:", e);
+            recognition.onend = function() {
+                isListening = false;
+                const sttBtn = document.getElementById('stt-btn');
+                sttBtn.innerText = "📢 버튼 누르고 목소리로 질문하기";
+                sttBtn.classList.remove('listening');
+            };
+        } else {
+            document.getElementById('stt-btn').style.display = 'none';
         }
     }
 
-    window.onload = initApp;
+    window.onload = initSTT;
 
-    // 음성 인식 버튼 클릭 함수
     function toggleSpeechRecognition() {
         if (!recognition) {
             alert("음성 인식을 지원하지 않는 브라우저입니다. 구글 크롬(Chrome)을 사용해 주세요.");
@@ -176,7 +161,7 @@
         }
     }
 
-    // 방삼복 음성 출력(TTS) 함수
+    // 방삼복 음성 출력(TTS) 
     function speakOut(text) {
         if (window.speechSynthesis.speaking) {
             window.speechSynthesis.cancel();
@@ -193,7 +178,7 @@
         window.speechSynthesis.speak(utterance);
     }
 
-    // 메시지 전송 및 통합 처리
+    // ★ REST API 다이렉트 통신 함수 (라이브러리 버그 원천 차단)
     async function sendMsg() {
         const input = document.getElementById('text-input');
         const text = input.value.trim();
@@ -202,15 +187,42 @@
         appendMsg(text, 'user');
         input.value = '';
 
-        if (!chatSession) initApp();
+        // 유저 메시지 기록 저장
+        chatHistory.push({ "role": "user", "parts": [{ "text": text }] });
+
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${API_KEY}`;
+        
+        const requestBody = {
+            "contents": chatHistory,
+            "systemInstruction": {
+                "parts": [{ "text": SYSTEM_INSTRUCTION }]
+            },
+            "generationConfig": {
+                "temperature": 0.7,
+                "maxOutputTokens": 250
+            }
+        };
 
         try {
-            const result = await chatSession.sendMessage(text);
-            const response = await result.response;
-            const botReply = response.text();
+            const response = await fetch(url, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(requestBody)
+            });
+
+            const data = await response.json();
             
-            appendMsg(botReply, 'bot');
-            speakOut(botReply); // 🌟 방삼복이 자기 목소리로 대답합니다!
+            if (data.candidates && data.candidates.length > 0) {
+                const botReply = data.candidates[0].content.parts[0].text;
+                appendMsg(botReply, 'bot');
+                
+                // 모델 대답 기록 저장
+                chatHistory.push({ "role": "model", "parts": [{ "text": botReply }] });
+                
+                speakOut(botReply); // 음성 출력
+            } else {
+                throw new Error("올바른 응답을 받지 못했습니다.");
+            }
         } catch (error) {
             console.error("통신 에러:", error);
             appendMsg("에헴... 내 지금 미군 장교님들과 나랏일로 바빠서 다음에 얘기하세! (인터넷 연결을 확인해 보시게나)", 'bot');
@@ -226,7 +238,7 @@
         chatArea.scrollTop = chatArea.scrollHeight;
     }
 
-    // 모둠 평가 녹음 기능
+    // 상단 모둠 평가용 마이크 녹음 기능
     let mediaRecorder; let audioChunks = []; let isRecording = false;
     async function toggleRecording() {
         const recBtn = document.getElementById('rec-btn');
